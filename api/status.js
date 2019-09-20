@@ -1,0 +1,7 @@
+module.exports = {
+    USER_BOOKED: 178,
+    USER_CANCELLED: 193,
+    ORDER_DEPLOYED: 239,
+    ORDER_PICKED: 319,
+    ORDER_DELIVERED: 571,
+}

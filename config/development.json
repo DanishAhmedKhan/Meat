@@ -1,0 +1,4 @@
+{
+    "name": "Meat Development",
+    "db": "mongodb://localhost/meat_dev"
+}

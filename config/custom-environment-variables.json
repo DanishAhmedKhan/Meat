@@ -1,0 +1,8 @@
+{
+    "adminAuthToken": "meat_admin_jsonAuthToken",
+    "userAuthToken": "meat_user_jsonAuthToken",
+    "inventoryAuthToken": "meat_inventory_jsonAuthToken",
+    "deliveryBoyAuthToken": "meat_deliveryBoy_jsonAuthToken",
+    "meatSystemId": "meat_system_id",
+    "db": "meat_db"
+}

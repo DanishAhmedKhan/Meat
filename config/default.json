@@ -1,0 +1,7 @@
+{
+    "name": "Meat",
+    "server": {
+        "port": 4000
+    },
+    "inventorySearchMaxDistance": 10000
+}
