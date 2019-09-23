@@ -35,3 +35,48 @@ module.exports.validate = (data, schemaObject) => {
     
     return error;
 };
+
+module.exports.getCurrentDateTime = () => {
+    const dateTime = new Date();
+
+    const year = dateTime.getFullYear();
+    const month = dateTime.getMonth();
+    const day = dateTime.getDate();
+    const hour = dateTime.getHours();
+    const minute = dateTime.getMinutes();
+    const second = dateTime.getSeconds();
+    const timestamp = dateTime.getTime();
+
+    const currentDateTime = {
+        year, month, fay, hour, minute, second, timestamp
+    }
+    return currentDateTime;
+}
+
+module.exports.getCurrentDate = () => {
+    const dateTime = new Date();
+
+    const year = dateTime.getFullYear();
+    const month = dateTime.getMonth();
+    const day = dateTime.getDate();
+
+    const currentTime = {
+        year, month, day, 
+        hour: null,
+        minute: null,
+        second: null,
+    };
+    return currentTime;
+}
+
+module.exports.getNextDay = (currentDay) => {
+    const currentDate = new Date(
+        currentDay.year,
+        currentDay.month, 
+        currentDay.day,
+    );
+    const nextDayDate = new Date();
+    nextDayDate.setDate(currentDate.getDate() + 1);
+
+    return nextDayDate;
+};

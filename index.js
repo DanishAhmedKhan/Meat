@@ -29,13 +29,13 @@ admin.initializeApp({
 
 const env = app.get('env');
 const ipAddress = ip.address();
-console.log(`Trying to start gini server at ${ipAddress} (in ${env} mode)...`);
+console.log(`Trying to start meat server at ${ipAddress} (in ${env} mode)...`);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
 
-if (env == 'evelopment') {
+if (env == 'development') {
     app.use(morgan('tiny'));
 }
 
@@ -47,10 +47,12 @@ if (env == 'production') {
 const userApi = require('./api/user');
 const inventoryApi = require('./api/inventory');
 const deliveryBoyApi = require('./api/deliveryBoy');
+const productApi = require('./api/product');
 
 app.use('/api/user', userApi);
 app.use('/api/inventory', inventoryApi);
 app.use('/api/deliveryBoy', deliveryBoyApi);
+app.use('/api/product', productApi);
 
 // connecting to the mongoDB Atlas cloud storage
 const dbUrl = config.get('db');

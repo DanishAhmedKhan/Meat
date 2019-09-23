@@ -1,23 +1,26 @@
 const mongoose = require('mongoose');
 const config = require('config');
 const jwt = require('jsonwebtoken');
+const dateTimeSchema = require('../schema/dateTimeSchema');
 
 const Schema = mongoose.Schema;
 const ObjectId = Schema.ObjectId;
 
 const inventorySchema = new Schema({
     token: [{
-        type: String,
+        value: String,
+        online: Boolean,
     }],
     password: String,
     phoneNumber: String,
     helplineNumbers: [{
         type: String,
     }],
+    online: Boolean,
     location: {
         type: {
             type: String,
-            enum: [ 'Point' ], 
+            enum: [ 'Point' ],
             default: 'Point',
         },
         coordinates: {
@@ -30,6 +33,23 @@ const inventorySchema = new Schema({
         city: String,
         zip: String,
     },
+    currentOrders: [{
+        type: ObjectId,
+        ref: 'Order',
+    }],
+    orders: [{
+        type: ObjectId,
+        ref: 'Order',
+    }],
+    restaurentOrders: [{
+        orderId: {
+            type: ObjectId,
+            ref: 'Order',
+        },
+        deliveryDate: dateTimeSchema,
+    }],
+}, {
+    strict: false,
 });
 
 inventorySchema.methods.generateAuthToken = function() {

@@ -1,16 +1,12 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
-const mongoose = require('mongoose');
-const uuid = required('uuid');
 const nexmo = require('nexmo');
 const Joi = require('joi');
 const randomatic = require('randomatic');
-const _ = require('lodash');
 const __ = require('./apiUtil');
 const User = require('../schema/User');
 const Order = require('../schema/Order');
 const Inventory = require('../schema/Inventory');
-const Product = require('../schema/Product');
 const status = require('./status');
 
 const router = express.Router();
@@ -36,7 +32,11 @@ const registerNumber = async (req, res) => {
                     verificationCode: code,
                 });
                 await newUser.save();
-                res.status(200).send(__.success(newUser._id));
+
+                const authToken = newUser.generateAuthToken();
+                res.header('x-user-auth-token', authToken)
+                    .status(200)
+                    .send(__.success('Signed up.'));
             }
         }
     );
@@ -58,6 +58,9 @@ const rsendVerificationCode = async (req, res) => {
             if (error) return res.status(503).send(__.error('Server error. Please Retry.'));
             else {
                 console.log(responseDate);
+                await User.updateOne({ _id: req.user._id }, {
+                    $set: { verificationCode: code }
+                });
                 res.status(200).send(__.success('Code resent'));
             }
         }
@@ -71,19 +74,22 @@ const verifyNumber = async (req, res) => {
     });
     if (error) return res.status(400).send(__.error(error.details[0].message));
 
+    let isVerified = false;
     const { verificationCode } = await User.findOne({ _id: req.user._id }, 'verificationCode');
     if (req.body.code === verificationCode) {
         await User.updateOne({ _id: req.user._id }, {
             $unset: { verificationCode: 1 }
         });
-        
-        res.status(200).send(__.success('Number verified.'));
+        isVerified = true;
     }
+
+    res.status(200).send(__.success(isVerified));
 };
 
 const password = async (req, res) => {
     const error = __.validate(req.body, {
         deviceId: Joi.string().required(),
+        token: Joi.string().required(),
         password: Joi.string().required(),
     });
     if (error) return res.status(400).send(__.error(error.details[0].message));
@@ -94,6 +100,7 @@ const password = async (req, res) => {
     await User.updateOne({ _id: req.user._id }, {
         $set: { 
             deviceId: req.body.deviceId,
+            token: req.body.token,
             password: hashedPassword 
         }
     });
@@ -116,6 +123,19 @@ const profile = async (req, res) => {
 
     res.status(200).send(__.success('Profile added'));
 };  
+
+const addSecondNumner = async (req, res) => {
+    const error = __.validate(req.body, {
+        number: Joi.string().required(),
+    });
+    if (error) return res.status(__.error(error.details[0].message));
+
+    await User.findOne({ _id: req.user._id }, {
+        $set: { secondPhoneNumber: req.body.number }
+    });
+    
+    res.status(200).send(__.success('Phone number added.'));
+};
 
 const signup = async (req, res) => {
     const error = __.validate(req.body, {
@@ -171,7 +191,7 @@ const login = async (req, res) => {
     });
     if (error) return res.status(400).send(__.error(error.details[0].message));
 
-    let user = await User.findOne({ phoneNumber: req.body.phoneNumber });
+    let user = await User.findOne({ phoneNumber: req.body.phoneNumber }, 'password');
     if (!user) return res.status(400).send(__.error('The phone number is not registered'));
 
     const validPassword = await bcrypt.compare(req.body.password, user.password);
@@ -181,8 +201,8 @@ const login = async (req, res) => {
         $set: { token: req.body.token }
     });
 
-    const token = user.generateAuthToken();
-    res.header('x-user-auth-token', token)
+    const authToken = user.generateAuthToken();
+    res.header('x-user-auth-token', authToken)
        .status(200)
        .send(__.success('Loged in.'));
 };
@@ -209,11 +229,13 @@ const order = async (req, res) => {
             quantity: Joi.number().required(),
             unit: Joi.number().required(),
         }),
+        preorderDate: Joi.object({
+            year: Joi.number().min(new Date().getFullYear()).required(),
+            month: Joi.number().required(),
+            day: Joi.number().required(),
+        }),
     });
     if (error) return res.status(400).send(__.error(error.details[0].message));
-
-    const user = await User.findOne({ _id: req.user._id }, 
-        'phoneNumber token label');
     
     const nearestInventory = await Inventory.findOne({
         geolocation: {
@@ -225,7 +247,26 @@ const order = async (req, res) => {
                 $maxDistance: 10000 // 10km
             },
         },
-    }, '_id token phoneNumber');
+    }, '_id online');
+
+    let deliveryDate;
+    if (req.body.preorderDate != null) 
+        deliveryDate = req.body.preorderDate;
+    else {
+        let currentDate = __.getCurrentDate();
+        if (nearestInventory.online) deliveryDate = currentDate;
+        else deliveryDate = __.getNextDay(currentDate);
+    }
+    
+
+    const onlineToken;
+    for (let i = 0; i < nearestInventory.token.length; i++) {
+        if (nearestInventory.token[i].online)
+            onlineToken = nearestInventory.token[i].value;
+    }
+
+    const user = await User.findOne({ _id: req.user._id }, 
+        'phoneNumber token label');
 
     let order = new Order({
         user: {
@@ -235,9 +276,8 @@ const order = async (req, res) => {
         },
         inventory: {
             id: nearestInventory._id,
-            token: nearestInventory.token,
-            phoneNumber: nearestInventory.phoneNumber,
         },
+        deliveryDate: deliveryDate,
         stats: {
             totalPrice: req.body.totalPrice,
             item: req.body.order,
@@ -248,11 +288,15 @@ const order = async (req, res) => {
         },
         status: status.USER_BOOKED,
     });
-
     await order.save();
+
     await User.updateOne({ _id: req.user._id }, {
         $set: { currentOrder: order._id },
         $push: { orders: order._id },
+    });
+
+    await Inventory.updateOne({ _id: nearestInventory._id }, {
+        $push: { currentOrders: order._id }
     });
 
     __.sendNotification({
@@ -260,10 +304,28 @@ const order = async (req, res) => {
             status: status.USER_BOOKED,
             order: order + ''
         },
-        token: nearestInventory.token,
+        token: onlineToken,
     });
 
     res.status(200).send(__.success(order._id));
+};
+
+const resetDeliveryDate = async (req, res) => {
+    const error = __.validate(req.body, {
+        orderId: Joi.string().required(),
+        preorderDate: Joi.object({
+            year: Joi.number().min(new Date().getFullYear()).required(),
+            month: Joi.number().required(),
+            day: Joi.number().required(),
+        })
+    });
+    if (error) return res.status(400).send(__.error(error.details[0].message));
+
+    await Order.updateOne({ _id: req.body.orderId }, {
+        $set: { deliveryDate: req.body.preorderDate }
+    });
+
+    res.status(200).send(__.success('Delivery Date set.'));
 };
 
 const cancelOrder = async (req, res) => {
@@ -294,15 +356,29 @@ const cancelOrder = async (req, res) => {
     });
 };
 
+const getInventoryOnlineStatus = async (req, res) => {
+    const error = __.validate(req.body, {
+        inventoryId: Joi.string().required(),
+    });
+    if (error) return res.status(400).send(__.error(error.details[0].message));
+
+    const { online } = await Inventory.findOne({ _id: req.body.inventoryId }, 'online');
+    res.status(200).send(__.success(online));
+}
+
 router.post('./registerNumber', registerNumber);
 router.post('./resendVerificationCode', rsendVerificationCode);
 router.post('./verifyNumber', verifyNumber);
 router.post('./password', password);
 router.post('./profile', profile);
+router.post('./addSecondPhoneNumber', addSecondNumner);
 router.post('./signup', signup);
 router.post('./login', login);
 router.post('./checkDeviceId', checkDeviceId);
 router.post('./token', token);
 router.post('./order', order);
+router.post('./resetDeliveryDate', resetDeliveryDate);
+router.post('./cancelOrder', cancelOrder);
+router.post('./getInventoryOnlineStatus', getInventoryOnlineStatus);
 
 module.exports = router;

@@ -32,6 +32,10 @@ const userSchema = new Schema({
         type: String,
         minlength: 10,
     },
+    secondPhoneNumber: {
+        type: String,
+        minlength: 10,
+    },
     verificationCode: {
         type: String,
     },

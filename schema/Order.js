@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
-const config = require('config');
-const jwt = require('jsonwebtoken');
+const dateTimeSchema = require('../schema/dateTimeSchema');
 
 const Schema = mongoose.Schema;
 const ObjectId = Schema.ObjectId;
@@ -14,6 +13,12 @@ const orderSchema = new Schema({
         token: String,
         number: String,
     },
+    inventory: {
+        id: {
+            type: ObjectId,
+            ref: 'Inventory',
+        },
+    },
     deliveryBoy: {
         id: {
             type: ObjectId,
@@ -22,30 +27,33 @@ const orderSchema = new Schema({
         token: String,
         number: String,
     },
+    deliveryDate: {
+        type: dateTimeSchema,
+    },
     userAddress: {
         name: String,
         address: {
             line: String, 
             state: String, 
-            city: String, 
-            zip: String 
+            city: String,
+            zip: String,
         },
         location:{
             type: {
-                type: String, 
+                type: String,
                 enum: [ 'Point' ],
                 default: 'Point',
             },
             coordinates: {
-                type: [Number]
+                type: [ Number ]
             }
         }
     },
     status: Number,
     timing: {
-        book: Date,
-        pickup: Date,
-        drop: Date,
+        book: dateTimeSchema,
+        pickup: dateTimeSchema,
+        drop: dateTimeSchema,
     },
     stats: {
         totalPrice: Number,
@@ -58,6 +66,8 @@ const orderSchema = new Schema({
             quantity: Number,
             unit: String,
         }],
+    },
+    deliveryDetail: {
         distance: Number,
         deliveryFare: Number,
         deliveryFareDetails: {
@@ -79,7 +89,7 @@ const orderSchema = new Schema({
         value: Boolean,
         by: {
             type: String,
-            enum: ['user', 'deliveryBoy']
+            enum: [ 'user', 'deliveryBoy' ]
         },
         time: Date,
     }

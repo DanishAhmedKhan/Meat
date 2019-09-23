@@ -1,10 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
-const mongoose = require('mongoose');
 const Joi = require('joi');
-const _ = require('lodash');
 const __ = require('./apiUtil');
-const User = require('../schema/User');
 const Order = require('../schema/Order');
 const Inventory = require('../schema/Inventory');
 const status = require('./status');
@@ -13,7 +10,6 @@ const router = express.Router();
 
 const signup = async (req, res) => {
     const error = __.validate(req.body, {
-        token: Joi.string().required(),
         email: Joi.string().email().required(),
         password: Joi.string().required(),
         address: Joi.object({
@@ -31,7 +27,6 @@ const signup = async (req, res) => {
     if (inventory) return res.status(400).send(__.error('Email already registered.'));
 
     inventory = {
-        token: [ req.body.token ],
         password: req.body.password,
         email: req.body.email,
         address: req.body.address,
@@ -68,14 +63,19 @@ const login = async (req, res) => {
     if (!validPassword) return res.status(400).send(__.error('Invalid password'));
 
     await Inventory.updateOne({ _id: inventory._id }, {
-        $set: { token: req.body.token }
+        $set: {
+            token: {
+                value: req.body.token,
+                online: false,
+            }
+        }
     });
 
     const token = inventory.generateAuthToken();
     res.header('x-inventory-auth-token', token)
        .status(200)
        .send(__.success('Loged in.'));
-}; 
+};
 
 const token = async (req, res) => {
     const error = __.validate(req.body, {
@@ -84,10 +84,84 @@ const token = async (req, res) => {
     if (error) return res.status(200).send(__.error(error.details[0].message));
 
     await Inventory.updateOne({ _id: req.inventory._id }, {
-        $set: { token: req.body.token }
+        $set: {
+            token: {
+                value: req.body.token,
+                online: false,
+            }
+        }
     });
 
     res.status(200).send(__.success('Token updated'));
+};
+
+const online = async (req, res) => {
+    const error = __.validate(req.body, {
+        token: Joi.string().required(),
+    });
+    if (error) return res.status(400).send(__.success(error.details[0].message));
+
+    const inventory = await Inventory.findOne({ _id: req.inventory._id }, 'token');
+
+    let currentOnlineIndex, newOnlineIndex;
+    for (let i = 0; i < inventory.token.length; i++) {
+        if (inventory.token[i].online === true)
+            currentOnlineToken = i;
+        if (inventory.token[i].token === req.body.token)
+            newOnlineToken = i;
+    }
+
+    const newToken = inventory.token;
+    newToken[currentOnlineIndex].online = false;
+    newToken[newOnlineIndex].online = true;
+
+    await Inventory.updateOne({ _id: req.inventory._id }, {
+        $set: { 
+            token: newToken,
+            online: true, 
+        }
+    });
+
+    __.sendNotification({
+        data: {
+            status: status.GO_OFFLINE,
+        },
+        token: inventory.token[currentOnlineIndex].token,
+    });
+
+    res.status(200).send(__.success('Ste online.'));
+};
+
+const offline = async (req, res) => {
+    const error = __.validate(req.body, {
+        token: Joi.string().required(),
+    });
+    if (error) return res.status(400).send(__.error(error.details[0].message));
+
+    await Inventory.updateOne({
+        _id: req.inventory._id,
+        'token.value': req.body.token, 
+    }, {
+        $set: { 
+            'token.$.online': false,
+            online: false,
+        }
+    });
+
+    res.status(200).send(__.success('Set offline.'));
+};
+
+const addHelplineNumber = async (req, res) => {
+    const error = __.validate(req.body, {
+        number: Joi.string().required(),
+    });
+    if (error) return res.status(200).send(__.error(error.details[0].message));
+
+    await Inventory.updateOne({ _id: req.inventory._id }, {
+        $push: { helplineNumbers: req.body.number }
+    });
+
+    res.status(200).send(__.success('Helpline number added.'));
 };
 
 const allocateDeliveryBoy = async (req, res) => {
@@ -129,6 +203,9 @@ const allocateDeliveryBoy = async (req, res) => {
 router.post('./signup', signup);
 router.post('./login', login);
 router.post('./token', token);
+router.post('./online', online);
+router.post('./offline', offline);
+router.post('./addHelplineNumber', addHelplineNumber);
 router.post('./allocateDeliveryBoy', allocateDeliveryBoy);
 
 module.exports = router;
