@@ -1,9 +1,11 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const Joi = require('joi');
+const _ = require('lodash');
 const __ = require('./apiUtil');
 const Order = require('../schema/Order');
 const Inventory = require('../schema/Inventory');
+const Product = require('../schema/Product');
 const status = require('./status');
 
 const router = express.Router();
@@ -166,14 +168,16 @@ const addHelplineNumber = async (req, res) => {
 
 const allocateDeliveryBoy = async (req, res) => {
     const error = __.validate({
-        orderId: Joi.string().required(),
+        orderIds: Joi.array(Joi.string()),
         uid: Joi.string().required(),
     });
     if (error) return res.status(400).send(__.error(error.details[0].message));
 
     const deliveryBoy = await DeliveryBoy.findOneAndUpdate({ uid: req.body.uid }, {
-        $set: { currentDelivery: req.body.orderId },
-        $push: { delivery: req.body.orderId }
+        $set: { currentDelivery: req.body.orderIds },
+        $push: {
+            delivery: { $each: req.body.orderIds }
+        }
     });
 
     await Order.updateOne({ _id: req.body.orderId }, {
@@ -184,7 +188,7 @@ const allocateDeliveryBoy = async (req, res) => {
                 number: deliveryBoy.phoneNumber,
             },
             status: status.ORDER_PICKED,
-            timing: { pickuo: new Date() },
+            timing: { pickup: __.getCurrentDateTime() },
 
         }
     });
@@ -200,6 +204,57 @@ const allocateDeliveryBoy = async (req, res) => {
     res.status(200).send(__.success('Order allocated.'))
 };
 
+const getRestaurantOrders = async (req, res) => {
+    const error = __.validate(req.body, {
+        date: Joi.object({
+            year: Joi.string().required(),
+            month: Joi.string().required(),
+            day: Joi.string().required(),
+        }),
+    });
+    if (error) return res.status(400).send(__.error(error.details[0].message));
+
+    const { restaurantOrders } = await Inventory.findOne({ _id: req.inventory._id }, 
+        'restaurantOrders');
+
+    let allProductDetails = [], product;
+    let products = await Product.findAll();
+    for (let i = 0; i < products.length; i++) {
+        product = {
+            _id: products[i]._id,
+            name: products[i].name,
+            type: products[i].type,
+            price: products[i].price,
+            totalOrderWeight: 0,
+            totalOrderCost: 0,
+        };
+        allProductDetails[i] = product;
+    }
+
+    let todaysOrder = [], order, item, k = 0, item, pos;
+    for (let i = 0; i < restaurantOrders.length; i++) {
+        if (_.isEqual(restaurantOrders[i].deliveryDate, req.body.date)) {
+            order = await Order.findOne({ _id: restaurantOrders[i].orderId });
+            todaysOrder[k++] = order;
+
+            item = order.stats.item;
+            for (let j = 0; j < item.length; j++) {
+                pos = allProductDetails.map(e => { return e._id; })
+                    .indexOf(item[i].productId);
+
+                allProductDetails[pos].totalOrderWeight += item[i].quantity;
+                allProductDetails[pos].totalOrderCost += order.stats.totalPrice;
+            }
+        }
+    }
+
+    res.status(200).send(__.success({
+        todaysOrder,
+        allProductDetails,
+    }));
+};  
+
+
 router.post('./signup', signup);
 router.post('./login', login);
 router.post('./token', token);
@@ -207,5 +262,6 @@ router.post('./online', online);
 router.post('./offline', offline);
 router.post('./addHelplineNumber', addHelplineNumber);
 router.post('./allocateDeliveryBoy', allocateDeliveryBoy);
+router.post('./getRestaurantOrders', getRestaurantOrders);
 
 module.exports = router;

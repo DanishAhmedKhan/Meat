@@ -41,7 +41,7 @@ const inventorySchema = new Schema({
         type: ObjectId,
         ref: 'Order',
     }],
-    restaurentOrders: [{
+    restaurantOrders: [{
         orderId: {
             type: ObjectId,
             ref: 'Order',

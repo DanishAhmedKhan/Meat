@@ -220,9 +220,38 @@ const token = async (req, res) => {
     res.send(200).send(__.success('Token updated.'));
 };
 
+const label = async (req, res) => {
+    const error = __.validate(req.body, {
+        name: Joi.string().required(),
+        address: Joi.string({
+            line: Joi.string().required(),
+            state: Joi.string().required(),
+            city: Joi.string().required(),
+            zip: Joi.string().required(),
+        }),
+        location: Joi.object({
+            type: Joi.string().required(),
+            coordinates: Joi.array(Joi.number()),
+        }),
+    });
+    if (error) return res.status(400).send(__.error(error.details[0].message));
+
+    await User.updateOne({ _id: req.body._id }, {
+        $push: {
+            label: {
+                name: req.body.name,
+                address: req.body.address,
+                location: req.body.location,
+            }
+        }
+    });
+
+    res.status(200).send(__.success())
+};
+
 const order = async (req, res) => {
     const error = __.validate(req.body, {
-        addressLabelNumber: Joi.number().required(),
+        labelName: Joi.string().required(),
         totalPrice: Joi.number().required(),
         order: Joi.object({
             productId: Joi.string().required(),
@@ -258,7 +287,6 @@ const order = async (req, res) => {
         else deliveryDate = __.getNextDay(currentDate);
     }
     
-
     const onlineToken;
     for (let i = 0; i < nearestInventory.token.length; i++) {
         if (nearestInventory.token[i].online)
@@ -282,9 +310,11 @@ const order = async (req, res) => {
             totalPrice: req.body.totalPrice,
             item: req.body.order,
         },
-        userAddress: user.label[req.body.addressLabelNumber],   
+        userAddress: user.label[
+            user.label.filter(e => { return e.name == req.body.lebelName })
+        ],   
         timing: {
-            book: new Date(),
+            book: __.getCurrentDateTime(),
         },
         status: status.USER_BOOKED,
     });
@@ -295,8 +325,10 @@ const order = async (req, res) => {
         $push: { orders: order._id },
     });
 
+    const updateObj = { orders: null };
+    updateObj.order[__.getStringDate()] = order._id;
     await Inventory.updateOne({ _id: nearestInventory._id }, {
-        $push: { currentOrders: order._id }
+        $push: updateObj
     });
 
     __.sendNotification({
@@ -376,6 +408,7 @@ router.post('./signup', signup);
 router.post('./login', login);
 router.post('./checkDeviceId', checkDeviceId);
 router.post('./token', token);
+router.post('./label', label);
 router.post('./order', order);
 router.post('./resetDeliveryDate', resetDeliveryDate);
 router.post('./cancelOrder', cancelOrder);

@@ -115,9 +115,19 @@ const order = async (req, res) => {
 
 };
 
+const cancelOrder = async (req, res) => {
+    const error = __.validate(req.body, {
+        orderId: Joi.string().required(),
+    });
+    if (error) return res.status(__.error(error.details[0].message));
+
+    
+};
+
 router.signup('./signup', signup);
 router.login('./login', login);
 router.token('./token', token);
 router.order('./order', order);
+router.cancelOrder('./cancelOrder', cancelOrder);
 
 module.exports = router;

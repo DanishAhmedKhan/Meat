@@ -66,11 +66,11 @@ const userSchema = new Schema({
         location:{
             type: {
                 type: String, 
-                enum: ['Point'],
+                enum: [ 'Point' ],
                 default: 'Point',
             },
             coordinates: {
-                type: [Number]
+                type: [ Number ]
             }
         }
     }],

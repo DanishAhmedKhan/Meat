@@ -17,8 +17,7 @@ const produstSchema = new Schema({
     },
     price: {
         value: Number,
-        quamtity: Number,
-        unit: String
+        quantity: Number, // in kg
     },
     images: [{
         url: String,

@@ -101,6 +101,27 @@ const logout = async (req, res) => {
     res.status(200).send(__.success('Successfully logged out.'));
 };
 
+const online = async (req, res) => {
+    const error = __.validate(req.body, {
+        online: Joi.boolean().required(),
+    });
+    if (error) return res.status(400).send(__.error(error.details[0].message));
+
+    const onlineValue = online ? 'online' : 'offline';
+
+    await DeliveryBoy.updateOne({ _id: req.deliveryBoy._id }, {
+        $set: { 
+            'stats.online': req.body.online,
+            shifts: {
+                time: new Date(),
+                method: onlineValue,
+            }
+        }
+    });
+
+    res.status(200).send(__.success('Online value set.'));
+};
+
 const allocationResponse = async (req, res) => {
     const error = __.validate(req.body, {
         orderId: Joi.string().required(),
@@ -156,10 +177,37 @@ const deliverOrder = async (req, res) => {
 
     await Order.updateOne({ _id: req.body.orderId }, {
         $set: {
-            timing: { drop: new Date() },
+            timing: { delivery: __.getCurrentDateTime() },
             status: status.ORDER_DELIVERED,
-
         }
+    });
+
+    const { currentDelivery } = await DeliveryBoy.findOneAndUpdate({ _id: req.deliveryBoy._id }, {
+        $pull: { currentDelivery: req.body.orderId }
+    }, { fields: { currentDelivery: 1 } });
+
+    if (currentDelivery.length == 0) {
+        await DeliveryBoy.updateOne({ _id: req.deliveryBoy._id }, {
+            $set: { 'status.order': false }
+        });
+    }
+    
+    res.status(200).send(__.success('Order delivered'));
+};
+
+const deliverRestaurantOrder = async (req, res) => {
+    const error = __.validate(req.body, {
+        orderId: Joi.string().required(),
+    });
+    if (error) return res.statsu(400).send(__.error(error.details[0].message));
+
+    const { inventory } = await Order.findOneAndUpdate({ _id: req.body.orderId }, {
+        $set: {
+            timing: { delivery: __.getCurrentDateTime() },
+            status: status.ORDER_DELIVERED,
+        }
+    }, {
+        fields: { inventory: 1 }
     });
 
     await DeliveryBoy.updateOne({ _id: req.deliveryBoy._id }, {
@@ -168,15 +216,21 @@ const deliverOrder = async (req, res) => {
             currentDelivery: null,
         }
     });
-    
-    res.status(200).send(__.success('Order delivered'));
+
+    await Inventory.updateOne({ _id: inventory.id }, {
+        $pull: { restaurantOrders: req.body.orderId }
+    });
+
+    res.status(200).send(__.success('Order delivered.'));
 };
 
 router.post('./signup', signup);
 router.post('./login', login);
 router.post('./logout', logout);
+router.post('./online', online);
 router.post('./allocationResponse', allocationResponse);
 router.post('./location', location);
 router.post('./deliverOrder', deliverOrder);
+router.post('./deliverRestaurantOrder', deliverRestaurantOrder);
 
 module.exports = router;

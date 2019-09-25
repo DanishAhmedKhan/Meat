@@ -38,10 +38,10 @@ const deliveryBoySchema = new Schema({
         type: ObjectId,
         ref: 'Order',
     }],
-    currentDelivery: {
+    currentDelivery: [{
         type: ObjectId,
         ref: 'Order',
-    },
+    }],
     geolocation: {
         type: {
             type: String,

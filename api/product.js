@@ -9,7 +9,10 @@ const newProduct = async (req, res) => {
     const error = __.validate(req.body, {
         type: Joi.string().required(),
         name: Joi.string().required(),
-        price: Joi.number().required(),
+        price: Joi.object({
+            value: Joi.number().required(),
+            quantity: Joi.number().required(),
+        }),
         description: Joi.string().required(),
     });
     if (error) return res.status(400).send(__.error(error.details[0].message));
@@ -26,9 +29,12 @@ const newProduct = async (req, res) => {
 };
 
 const changePrice = async (req, res) => {
-    const newPrice = __.validate(req.body, {
+    const error = __.validate(req.body, {
         productId: Joi.string().required(),
-        price: Joi.number().required(),
+        price: Joi.object({
+            value: Joi.number().required(),
+            quantity: Joi.number().required(),
+        }),
     });
     if (error) return res.status(400).send(__.error(error.details[0].message));
 
@@ -45,6 +51,11 @@ const product = async (req, res) => {
 };
 
 const productByType = async (req, res) => {
+    const error = __validate(req.body, {
+        type: Joi.string().required(),
+    });
+    if (error) return res.status(400).send(__.error(error.details[0].message));
+
     const allProducts = await Product.findAll({ type: req.body.type });
     res.status(200).send(__.success(allProducts));
 };

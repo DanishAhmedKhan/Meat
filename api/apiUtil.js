@@ -1,21 +1,22 @@
 const Joi = require('joi');
 const admin = require('firebase-admin');
+const _ = require('lodash');
 
-module.exports.error = (msg) => {
+const error = (msg) => {
     return {
         status: 'error',
         msg: msg
     };
 };
 
-module.exports.success = (data) => {
+const success = (data) => {
     return {
         status: 'success',
         data: data
     };
 };
 
-module.exports.sendNotification = async (message) => {
+const sendNotification = async (message) => {
     await admin.messaging().send(message)
         .then(response => {
             console.log(response);
@@ -24,7 +25,7 @@ module.exports.sendNotification = async (message) => {
         });
 };
 
-module.exports.validate = (data, schemaObject) => {
+const validate = (data, schemaObject) => {
     const schema = Joi.object().keys(schemaObject);
 
     const { error } = Joi.validate(data, schema, {
@@ -36,7 +37,7 @@ module.exports.validate = (data, schemaObject) => {
     return error;
 };
 
-module.exports.getCurrentDateTime = () => {
+const getCurrentDateTime = () => {
     const dateTime = new Date();
 
     const year = dateTime.getFullYear();
@@ -48,12 +49,12 @@ module.exports.getCurrentDateTime = () => {
     const timestamp = dateTime.getTime();
 
     const currentDateTime = {
-        year, month, fay, hour, minute, second, timestamp
+        year, month, day, hour, minute, second, timestamp
     }
     return currentDateTime;
 }
 
-module.exports.getCurrentDate = () => {
+const getCurrentDate = () => {
     const dateTime = new Date();
 
     const year = dateTime.getFullYear();
@@ -69,7 +70,11 @@ module.exports.getCurrentDate = () => {
     return currentTime;
 }
 
-module.exports.getNextDay = (currentDay) => {
+const toStringDate = (date) => {
+    return date.year + '-' + date.month + '-' + date.day;
+}
+
+const getNextDay = (currentDay) => {
     const currentDate = new Date(
         currentDay.year,
         currentDay.month, 
@@ -79,4 +84,20 @@ module.exports.getNextDay = (currentDay) => {
     nextDayDate.setDate(currentDate.getDate() + 1);
 
     return nextDayDate;
+};
+
+const isToday = (date) => {
+    return _.isEqual(getCurrentDate, date);
+}
+
+module.exports = {
+    error, 
+    success,
+    sendNotification,
+    validate,
+    getCurrentDateTime,
+    toStringDate,
+    getCurrentDate,
+    getNextDay,
+    isToday,
 };

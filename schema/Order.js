@@ -53,7 +53,7 @@ const orderSchema = new Schema({
     timing: {
         book: dateTimeSchema,
         pickup: dateTimeSchema,
-        drop: dateTimeSchema,
+        delivery: dateTimeSchema,
     },
     stats: {
         totalPrice: Number,
@@ -63,8 +63,7 @@ const orderSchema = new Schema({
         },
         item: [{
             productId: ObjectId,
-            quantity: Number,
-            unit: String,
+            quantity: Number, // in kg
         }],
     },
     deliveryDetail: {
