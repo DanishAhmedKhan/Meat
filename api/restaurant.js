@@ -124,10 +124,10 @@ const cancelOrder = async (req, res) => {
     
 };
 
-router.signup('./signup', signup);
-router.login('./login', login);
-router.token('./token', token);
-router.order('./order', order);
-router.cancelOrder('./cancelOrder', cancelOrder);
+router.post('/signup', signup);
+router.post('/login', login);
+router.post('/token', token);
+router.post('/order', order);
+router.post('/cancelOrder', cancelOrder);
 
 module.exports = router;

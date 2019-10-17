@@ -5,6 +5,8 @@ const helmet = require('helmet');
 const mongoose = require('mongoose');
 const admin = require('firebase-admin');
 const config = require('config');
+const cors = require('cors');
+const ip = require('ip');
 
 const app = express();
 
@@ -29,7 +31,7 @@ admin.initializeApp({
 
 const env = app.get('env');
 const ipAddress = ip.address();
-console.log(`Trying to start meat server at ${ipAddress} (in ${env} mode)...`);
+console.log(`Trying to start Meat server at ${ipAddress} (in ${env} mode)...`);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));

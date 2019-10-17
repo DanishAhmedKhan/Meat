@@ -1,0 +1,5 @@
+set meat_admin_jsonAuthToken="123adminPPz"
+set meat_user_jsonAuthToken="kkGsupercell"
+set meat_inventory_jsonAuthToken="as8goal"
+set meat_deliveryBoy_jsonAuthToken="sachinkohli"
+set meat_system_id="meat-system"

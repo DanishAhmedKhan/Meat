@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const Joi = require('joi');
-const Product = require('./schema/Product');
+const Product = require('../schema/Product');
 
 const router = express.Router();
 
@@ -60,9 +60,9 @@ const productByType = async (req, res) => {
     res.status(200).send(__.success(allProducts));
 };
 
-router('./newProduct', newProduct);
-router('./changePrice', changePrice);
-router('./product', product);
-router('./productByType', productByType);
+router.post('/newProduct', newProduct);
+router.post('/changePrice', changePrice);
+router.post('/product', product);
+router.post('/productByType', productByType);
 
 module.exports = router;

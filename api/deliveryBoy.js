@@ -224,13 +224,13 @@ const deliverRestaurantOrder = async (req, res) => {
     res.status(200).send(__.success('Order delivered.'));
 };
 
-router.post('./signup', signup);
-router.post('./login', login);
-router.post('./logout', logout);
-router.post('./online', online);
-router.post('./allocationResponse', allocationResponse);
-router.post('./location', location);
-router.post('./deliverOrder', deliverOrder);
-router.post('./deliverRestaurantOrder', deliverRestaurantOrder);
+router.post('/signup', signup);
+router.post('/login', login);
+router.post('/logout', logout);
+router.post('/online', online);
+router.post('/allocationResponse', allocationResponse);
+router.post('/location', location);
+router.post('/deliverOrder', deliverOrder);
+router.post('/deliverRestaurantOrder', deliverRestaurantOrder);
 
 module.exports = router;

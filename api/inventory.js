@@ -16,14 +16,19 @@ const signup = async (req, res) => {
         password: Joi.string().required(),
         address: Joi.object({
             line: Joi.string().required(),
+            country: Joi.string().required(),
             state: Joi.string().required(),
             city: Joi.string().required(),
             zip: Joi.string().required(),
         }),
         lat: Joi.number().precision(8).min(-90).max(90).required(),
         lng: Joi.number().precision(8).min(-180).max(180).required(),
+        secretCode: Joi.string().required(),
     });
     if (error) return res.status(400).send(__.error(error.details[0].message));
+
+    if (req.body.secretCode !== 'meatisbest')
+        return res.status(403).send(__.error('Unauthorized to create a new inventory.')); 
 
     let inventory = await Inventory.findOne({ email: req.body.email });
     if (inventory) return res.status(400).send(__.error('Email already registered.'));
@@ -201,7 +206,30 @@ const allocateDeliveryBoy = async (req, res) => {
         token: deliveryBoy.token,
     });
 
-    res.status(200).send(__.success('Order allocated.'))
+    res.status(200).send(__.success('Order allocated.'));
+};
+
+const getUsersOrders = async (req, res) => {
+    const error = __.validate(req.body, {
+        date: Joi.object({
+            year: Joi.string().required(),
+            month: Joi.string().required(),
+            day: Joi.string().required(),
+        }),
+    });
+    if (error) return res.status(400).send(__.error(error.details[0].message));
+    
+    const inventory = Inventory.findOne({ _id: req.inventory._id }, 
+        'currentOrders.' + __.toStringDate(req.body.date));
+    const allOrders = [], orders = inventory.order[__.toStringDate(req.body.date)];
+
+    for (let i = 0; i < orders.length; i++) {
+        allOrders[i] = await Order.findOne({ _id: orders._id });
+    }
+
+    res.status(200).send(__.success({
+        allOrders,
+    }));
 };
 
 const getRestaurantOrders = async (req, res) => {
@@ -231,7 +259,7 @@ const getRestaurantOrders = async (req, res) => {
         allProductDetails[i] = product;
     }
 
-    let todaysOrder = [], order, item, k = 0, item, pos;
+    let todaysOrder = [], order, item, k = 0, pos;
     for (let i = 0; i < restaurantOrders.length; i++) {
         if (_.isEqual(restaurantOrders[i].deliveryDate, req.body.date)) {
             order = await Order.findOne({ _id: restaurantOrders[i].orderId });
@@ -255,13 +283,14 @@ const getRestaurantOrders = async (req, res) => {
 };  
 
 
-router.post('./signup', signup);
-router.post('./login', login);
-router.post('./token', token);
-router.post('./online', online);
-router.post('./offline', offline);
-router.post('./addHelplineNumber', addHelplineNumber);
-router.post('./allocateDeliveryBoy', allocateDeliveryBoy);
-router.post('./getRestaurantOrders', getRestaurantOrders);
+router.post('/signup', signup);
+router.post('/login', login);
+router.post('/token', token);
+router.post('/online', online);
+router.post('/offline', offline);
+router.post('/addHelplineNumber', addHelplineNumber);
+router.post('/allocateDeliveryBoy', allocateDeliveryBoy);
+router.post('/getUsersOrders', getUsersOrders);
+router.post('/getRestaurantOrders', getRestaurantOrders);
 
 module.exports = router;

@@ -23,10 +23,10 @@ const registerNumber = async (req, res) => {
 
     nexmo.message.sendSMS(
         senderPhoneNumber, recipientPhoneNumber, code, { type: 'unicode' },
-        (error, responseDate) => {
+        async (error, responseData) => {
             if (error) return res.status(503).send(__.error('Server error. Please Retry.'));
             else {
-                console.log(responseDate);
+                console.log(responseData);
                 const newUser = new User({
                     phoneNumber: req.body.number,
                     verificationCode: code,
@@ -36,7 +36,7 @@ const registerNumber = async (req, res) => {
                 const authToken = newUser.generateAuthToken();
                 res.header('x-user-auth-token', authToken)
                     .status(200)
-                    .send(__.success('Signed up.'));
+                    .send(__.success('Account created.'));
             }
         }
     );
@@ -54,7 +54,7 @@ const rsendVerificationCode = async (req, res) => {
 
     nexmo.message.sendSMS(
         senderPhoneNumber, recipientPhoneNumber, code, { type: 'unicode' },
-        (error, responseDate) => {
+        async (error, responseDate) => {
             if (error) return res.status(503).send(__.error('Server error. Please Retry.'));
             else {
                 console.log(responseDate);
@@ -124,13 +124,13 @@ const profile = async (req, res) => {
     res.status(200).send(__.success('Profile added'));
 };  
 
-const addSecondNumner = async (req, res) => {
+const addSecondNumber = async (req, res) => {
     const error = __.validate(req.body, {
         number: Joi.string().required(),
     });
-    if (error) return res.status(__.error(error.details[0].message));
+    if (error) return res.status(400).send(__.error(error.details[0].message));
 
-    await User.findOne({ _id: req.user._id }, {
+    await User.updateOne({ _id: req.user._id }, {
         $set: { secondPhoneNumber: req.body.number }
     });
     
@@ -223,7 +223,7 @@ const token = async (req, res) => {
 const label = async (req, res) => {
     const error = __.validate(req.body, {
         name: Joi.string().required(),
-        address: Joi.string({
+        address: Joi.object({
             line: Joi.string().required(),
             state: Joi.string().required(),
             city: Joi.string().required(),
@@ -231,12 +231,12 @@ const label = async (req, res) => {
         }),
         location: Joi.object({
             type: Joi.string().required(),
-            coordinates: Joi.array(Joi.number()),
+            coordinates: Joi.array(Joi.number()).required(),
         }),
     });
     if (error) return res.status(400).send(__.error(error.details[0].message));
 
-    await User.updateOne({ _id: req.body._id }, {
+    await User.updateOne({ _id: req.user._id }, {
         $push: {
             label: {
                 name: req.body.name,
@@ -246,7 +246,7 @@ const label = async (req, res) => {
         }
     });
 
-    res.status(200).send(__.success())
+    res.status(200).send(__.success('Label added.'))
 };
 
 const order = async (req, res) => {
@@ -260,18 +260,22 @@ const order = async (req, res) => {
         }),
         preorderDate: Joi.object({
             year: Joi.number().min(new Date().getFullYear()).required(),
-            month: Joi.number().required(),
-            day: Joi.number().required(),
+            month: Joi.number().min(0).max(12).required(),
+            day: Joi.number().min(0).max(31).required(),
         }),
     });
     if (error) return res.status(400).send(__.error(error.details[0].message));
     
+    const user = await User.findOne({ _id: req.user._id }, 
+        'phoneNumber token label');
+
+    const label = user.label.filter(e => { return e.name == req.body.lebelName })
     const nearestInventory = await Inventory.findOne({
         geolocation: {
             $near: {
                 $geometry: {
                     type: 'Point',
-                    coordinates: user.label[req.body.labelNumber].location.coordinates,
+                    coordinates: label.location.coordinates,
                 },
                 $maxDistance: 10000 // 10km
             },
@@ -287,14 +291,13 @@ const order = async (req, res) => {
         else deliveryDate = __.getNextDay(currentDate);
     }
     
-    const onlineToken;
+    let onlineToken;
     for (let i = 0; i < nearestInventory.token.length; i++) {
-        if (nearestInventory.token[i].online)
+        if (nearestInventory.token[i].online) {
             onlineToken = nearestInventory.token[i].value;
+            break;
+        }
     }
-
-    const user = await User.findOne({ _id: req.user._id }, 
-        'phoneNumber token label');
 
     let order = new Order({
         user: {
@@ -310,9 +313,7 @@ const order = async (req, res) => {
             totalPrice: req.body.totalPrice,
             item: req.body.order,
         },
-        userAddress: user.label[
-            user.label.filter(e => { return e.name == req.body.lebelName })
-        ],   
+        userAddress: label,   
         timing: {
             book: __.getCurrentDateTime(),
         },
@@ -325,36 +326,51 @@ const order = async (req, res) => {
         $push: { orders: order._id },
     });
 
-    const updateObj = { orders: null };
-    updateObj.order[__.getStringDate()] = order._id;
+    const updateObj = {};
+    updateObj['currentOrders.' + __.toStringDate(deliveryDate)] = order._id;
     await Inventory.updateOne({ _id: nearestInventory._id }, {
-        $push: updateObj
+        $push: updateObj,
     });
 
-    __.sendNotification({
-        data: {
-            status: status.USER_BOOKED,
-            order: order + ''
-        },
-        token: onlineToken,
-    });
-
+    if (__.isToday(deliveryDate)) {
+        __.sendNotification({
+            data: {
+                status: status.USER_BOOKED,
+                order: order + ''
+            },
+            token: onlineToken,
+        });
+    }
+    
     res.status(200).send(__.success(order._id));
 };
 
 const resetDeliveryDate = async (req, res) => {
     const error = __.validate(req.body, {
         orderId: Joi.string().required(),
+        prviousOrderDate: Joi.object({
+            year: Joi.number().min(new Date().getFullYear()).required(),
+            month: Joi.number().min(0).max(12).required(),
+            day: Joi.number().min(0).max(31).required(),
+        }),
         preorderDate: Joi.object({
             year: Joi.number().min(new Date().getFullYear()).required(),
-            month: Joi.number().required(),
-            day: Joi.number().required(),
+            month: Joi.number().min(0).max(12).required(),
+            day: Joi.number().min(0).max(31).required(),
         })
     });
     if (error) return res.status(400).send(__.error(error.details[0].message));
 
-    await Order.updateOne({ _id: req.body.orderId }, {
+    const order = await Order.findOneAndUpdate({ _id: req.body.orderId }, {
         $set: { deliveryDate: req.body.preorderDate }
+    });
+
+    const pushUpdate = {}, pullUpdate = {};
+    pushUpdate['currentOrders.' + __.toStringDate(req.body.preorderDate)] = req.body.orderId;
+    pullUpdate['currentOrders.' + __.toStringDate(req.body.prviousOrderDate)] = req.body.orderId;
+    await Inventory.updateOne({ _id: order.inventory.id }, {
+        $push: pushUpdate,
+        $pull: pullUpdate,
     });
 
     res.status(200).send(__.success('Delivery Date set.'));
@@ -377,6 +393,13 @@ const cancelOrder = async (req, res) => {
         }
     });
 
+    const pullUpdate = {};
+    pullUpdate['currentOrders.' + __.toStringDate(order.deliveryDate)] = order._id;
+    await Inventory.updateOne({ _id: order.inventory.id }, {
+        $push: { cancelOrders: req.body.orderId, },
+        $pull: pullUpdate,
+    })
+
     await User.updateOne({ _id: req.user._id }, {
         $push: { cancelOrders: req.body.orderId },
         $inc: { 'stats.cencelOrder': 1 },
@@ -398,20 +421,20 @@ const getInventoryOnlineStatus = async (req, res) => {
     res.status(200).send(__.success(online));
 }
 
-router.post('./registerNumber', registerNumber);
-router.post('./resendVerificationCode', rsendVerificationCode);
-router.post('./verifyNumber', verifyNumber);
-router.post('./password', password);
-router.post('./profile', profile);
-router.post('./addSecondPhoneNumber', addSecondNumner);
-router.post('./signup', signup);
-router.post('./login', login);
-router.post('./checkDeviceId', checkDeviceId);
-router.post('./token', token);
-router.post('./label', label);
-router.post('./order', order);
-router.post('./resetDeliveryDate', resetDeliveryDate);
-router.post('./cancelOrder', cancelOrder);
-router.post('./getInventoryOnlineStatus', getInventoryOnlineStatus);
+router.post('/registerNumber', registerNumber);
+router.post('/resendVerificationCode', rsendVerificationCode);
+router.post('/verifyNumber', verifyNumber);
+router.post('/password', password);
+router.post('/profile', profile);
+router.post('/addSecondPhoneNumber', addSecondNumber);
+router.post('/signup', signup);
+router.post('/login', login);
+router.post('/checkDeviceId', checkDeviceId);
+router.post('/token', token);
+router.post('/label', label);
+router.post('/order', order);
+router.post('/resetDeliveryDate', resetDeliveryDate);
+router.post('/cancelOrder', cancelOrder);
+router.post('/getInventoryOnlineStatus', getInventoryOnlineStatus);
 
 module.exports = router;

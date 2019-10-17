@@ -60,7 +60,7 @@ const deliveryBoySchema = new Schema({
     }],
 });
 
-inventorySchema.methods.generateAuthToken = function() {
+deliveryBoySchema.methods.generateAuthToken = function() {
     return jwt.sign({ _id: this._id }, config.get('deliveryBoyAuthToken'));
 };
 

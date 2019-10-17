@@ -29,15 +29,14 @@ const inventorySchema = new Schema({
     },
     address: {
         line: String,
+        country: String,
         state: String,
         city: String,
         zip: String,
     },
-    currentOrders: [{
-        type: ObjectId,
-        ref: 'Order',
-    }],
-    orders: [{
+    currentOrders: {},
+    orders: {},
+    cancelOrders: [{
         type: ObjectId,
         ref: 'Order',
     }],
