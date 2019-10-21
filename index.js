@@ -34,7 +34,7 @@ const ipAddress = ip.address();
 console.log(`Trying to start Meat server at ${ipAddress} (in ${env} mode)...`);
 
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors());
 
 if (env == 'development') {

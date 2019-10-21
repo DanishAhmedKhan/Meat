@@ -7,6 +7,7 @@ const Restaurant = require('../schema/Restaurant');
 const Order = require('../schema/Order');
 const Inventory = require('../schema/Inventory');
 const status = require('./status');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 

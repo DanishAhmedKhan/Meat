@@ -7,10 +7,13 @@ const Schema = mongoose.Schema;
 const ObjectId = Schema.ObjectId;
 
 const inventorySchema = new Schema({
-    token: [{
-        value: String,
-        online: Boolean,
-    }],
+    // token: [{
+    //     value: String,
+    //     online: Boolean,
+    // }],
+    token: {
+        type: String,
+    },
     password: String,
     phoneNumber: String,
     helplineNumbers: [{
@@ -55,5 +58,5 @@ inventorySchema.methods.generateAuthToken = function() {
     return jwt.sign({ _id: this._id }, config.get('inventoryAuthToken'));
 };
 
-const Inventory = mongoose.model('DeliveryGuy', inventorySchema);
+const Inventory = mongoose.model('Inventory', inventorySchema);
 module.exports = Inventory;

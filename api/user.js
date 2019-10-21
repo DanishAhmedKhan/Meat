@@ -8,6 +8,7 @@ const User = require('../schema/User');
 const Order = require('../schema/Order');
 const Inventory = require('../schema/Inventory');
 const status = require('./status');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -425,16 +426,16 @@ router.post('/registerNumber', registerNumber);
 router.post('/resendVerificationCode', rsendVerificationCode);
 router.post('/verifyNumber', verifyNumber);
 router.post('/password', password);
-router.post('/profile', profile);
+router.post('/profile', auth, profile);
 router.post('/addSecondPhoneNumber', addSecondNumber);
 router.post('/signup', signup);
 router.post('/login', login);
 router.post('/checkDeviceId', checkDeviceId);
 router.post('/token', token);
-router.post('/label', label);
-router.post('/order', order);
-router.post('/resetDeliveryDate', resetDeliveryDate);
-router.post('/cancelOrder', cancelOrder);
-router.post('/getInventoryOnlineStatus', getInventoryOnlineStatus);
+router.post('/label', auth, label);
+router.post('/order', auth, order);
+router.post('/resetDeliveryDate', auth, resetDeliveryDate);
+router.post('/cancelOrder', auth, cancelOrder);
+router.post('/getInventoryOnlineStatus', auth, getInventoryOnlineStatus);
 
 module.exports = router;

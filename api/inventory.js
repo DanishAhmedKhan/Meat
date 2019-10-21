@@ -7,10 +7,12 @@ const Order = require('../schema/Order');
 const Inventory = require('../schema/Inventory');
 const Product = require('../schema/Product');
 const status = require('./status');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
 const signup = async (req, res) => {
+    console.log(req.body);
     const error = __.validate(req.body, {
         email: Joi.string().email().required(),
         password: Joi.string().required(),
@@ -31,6 +33,7 @@ const signup = async (req, res) => {
         return res.status(403).send(__.error('Unauthorized to create a new inventory.')); 
 
     let inventory = await Inventory.findOne({ email: req.body.email });
+    console.log(inventory);
     if (inventory) return res.status(400).send(__.error('Email already registered.'));
 
     inventory = {
@@ -42,6 +45,8 @@ const signup = async (req, res) => {
             coordinates: [ req.body.lng, req.body.lat ],
         }
     };
+    console.log(req.body.address);
+    console.log(inventory);
 
     const salt = await bcrypt.genSalt(10);
     inventory.password = await bcrypt.hash(inventory.password, salt);
@@ -102,7 +107,7 @@ const token = async (req, res) => {
     res.status(200).send(__.success('Token updated'));
 };
 
-const online = async (req, res) => {
+const onlineOld = async (req, res) => {
     const error = __.validate(req.body, {
         token: Joi.string().required(),
     });
@@ -158,6 +163,19 @@ const offline = async (req, res) => {
     res.status(200).send(__.success('Set offline.'));
 };
 
+const online = async (req, res) => {
+    const error = __.validate(req.body, {
+        online: Joi.boolean().required(),
+    });
+    if (error) return res.status(400).send(__.error(error.details[0].message));
+
+    await Inventory.updateOne({ _id: req.body.inventoryId }, {
+        $set: { online: req.body.online },
+    });
+
+    res.status(200).send(__.success('Online status set.'));
+};
+
 const addHelplineNumber = async (req, res) => {
     const error = __.validate(req.body, {
         number: Joi.string().required(),
@@ -185,18 +203,22 @@ const allocateDeliveryBoy = async (req, res) => {
         }
     });
 
-    await Order.updateOne({ _id: req.body.orderId }, {
-        $set: {
-            deliveryBoy: {
-                id: deliveryBoy._id,
-                token: deliveryBoy.token,
-                number: deliveryBoy.phoneNumber,
-            },
-            status: status.ORDER_PICKED,
-            timing: { pickup: __.getCurrentDateTime() },
-
-        }
-    });
+    for (let i = 0; i < req.body.orderIds.length; i++) {
+        await Order.updateOne({ _id: req.body.orderIds[i] }, {
+            $set: {
+                deliveryBoy: {
+                    id: deliveryBoy._id,
+                    token: deliveryBoy.token,
+                    number: deliveryBoy.phoneNumber,
+                },
+                status: status.ORDER_PICKED,
+                timing: { pickup: __.getCurrentDateTime() },
+            }
+        });
+    }
+    
+    const { token } = await Inventory.findOne({ _id: req.body.inventoryId },
+        'token');
 
     __.sendNotification({
         data: {
@@ -287,10 +309,10 @@ router.post('/signup', signup);
 router.post('/login', login);
 router.post('/token', token);
 router.post('/online', online);
-router.post('/offline', offline);
-router.post('/addHelplineNumber', addHelplineNumber);
-router.post('/allocateDeliveryBoy', allocateDeliveryBoy);
-router.post('/getUsersOrders', getUsersOrders);
-router.post('/getRestaurantOrders', getRestaurantOrders);
+router.post('/offline', auth, offline);
+router.post('/addHelplineNumber', auth, addHelplineNumber);
+router.post('/allocateDeliveryBoy', auth, allocateDeliveryBoy);
+router.post('/getUsersOrders', auth, getUsersOrders);
+router.post('/getRestaurantOrders', auth, getRestaurantOrders);
 
 module.exports = router;

@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const Joi = require('joi');
 const Product = require('../schema/Product');
+const auth = require('../middleware/auth');
 
 const router = express.Router();
 
